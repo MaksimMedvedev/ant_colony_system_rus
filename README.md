@@ -48,7 +48,7 @@
 
 ## Запуск
 
-+ from ACS import Colony
++ from ACS import Colony, input_matrix
 + distances = input_matrix()
 *ввести матрицу*
 + alg = Colony(distances)
