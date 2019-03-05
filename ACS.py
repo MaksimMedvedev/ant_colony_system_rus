@@ -24,7 +24,7 @@ class Colony:
         """
 
         np.fill_diagonal(distances, 0)
-        self.distances = distances
+        self.distances = np.array(distances)
         self._cities = list(range(len(distances)))
         self.ants_count = 2 * len(self._cities)
         self.alpha = alpha
@@ -250,7 +250,7 @@ def input_matrix():
     Если в рамках любой строки, следующей за первой, было введено больше значений, чем столбцов в первой строке,
     то "конец" введенного будет "обрезан"
 
-    :return: np.array(distances): матрица смежности как массив NumPy
+    :return: distances: матрица смежности
     """
     distances = []
     try:
@@ -258,9 +258,10 @@ def input_matrix():
         for num in range(len(distances[0]) - 1):
             distances.append([int(i) for i in input().split()[:len(distances[0])]])
     except:
-        return np.zeros((1,1))
-    return np.array(distances)
+        raise ValueError('Inappropriate symbol has been met (not int)')
+    return distances
 
-distances = input_matrix()
-x = Colony(distances)
-print(x.ants_full_search())
+if __name__ == '__main__':
+    distances = input_matrix()
+    x = Colony(distances)
+    print(x.ants_full_search())
