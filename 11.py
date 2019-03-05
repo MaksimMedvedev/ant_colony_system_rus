@@ -121,9 +121,9 @@ class Colony:
             """
             tau_delta = self.tau0
             for first_city, next_city in zip(self.tour_current[:-1], self.tour_current[1:]):
-                old_tau = Colony.pheromones_on_arcs_glob[first_city][next_city]
+                old_tau = self.pheromones_global[first_city][next_city]
                 new_tau = (1 - self.rho) * old_tau + self.rho * tau_delta
-                Colony.pheromones_on_arcs_glob[first_city][next_city] = new_tau
+                self.pheromones_global[first_city][next_city] = new_tau
 
     def __init__(self, distances, alpha = 0.6, beta = 2, rho = 0.3, q0 = 0.6):
         """
@@ -155,7 +155,8 @@ class Colony:
         self.min_nn_heuristic = self.__nearest_neighbor_heuristic()
         self.sigma = rho
         self.tau0 = 1 / (len(distances) * self.min_nn_heuristic) if len(distances) * self.min_nn_heuristic != 0 else 0
-        
+        self.pheromones_on_arcs_glob = np.full_like(self.distances, self.tau0, dtype = np.double)
+
         self.iters_count = 2 * len(self.cities)
         self.ants_count = 2 * len(self.cities)
         self.global_min_tour = []
@@ -167,12 +168,12 @@ class Colony:
         return self._cities.copy()
 
     def ants_full_search(self):
-        pheromones_on_arcs_glob = np.full_like(self.distances, self.tau0, dtype = np.double)
+        
         for iteration in self.iters_count:
             # поиск маршрута муравьями в количестве ants_count, локальное обновление феромонов каждым муравьем после поиска
             #self.tour_length, np.array(self.tour_current), self.pheromones_on_arcs_loc
             tours_of_all_ants = Parallel(n_jobs=2, backend="threading")(delayed(self.AntOnRoute(
-                    self.distances, self.cities, self.alpha, self.beta, self.rho, self.q0, self.tau0, pheromones_on_arcs_glob, 
+                    self.distances, self.cities, self.alpha, self.beta, self.rho, self.q0, self.tau0, self.pheromones_on_arcs_glob, 
                     self.min_nn_heuristic, self.first_time).travel_and_pheromones_update
                     )() 
                 for ant in range(self.ants_count)
