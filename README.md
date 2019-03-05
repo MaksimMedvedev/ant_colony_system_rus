@@ -49,5 +49,7 @@
 ## Запуск
 
 + from ACS import Colony
++ distances = input_matrix()
+*ввести матрицу*
 + alg = Colony(distances)
 + solution = alg.ants_full_search()
