@@ -12,43 +12,58 @@ class Colony:
         tau0: начальное количество феромона на каждом пути
         sigma: параметр, определяющий изменение феромона при глобальном обновлении феромонов (по смыслу равен rho)
         pheromones_on_arcs: распределение феромонов по дорогам
+        iters_count: количество запусков поиска колонией оптимального пути (неплохая точность была достигнута 
+            при iters_count = 2 * количество городов и при ants_count = 2 * количество городов)
+        ants_count: количество муравьев в колонии
+        global_min_tour: маршрут с наименьшей на текущий момент выполнения программы длиной
+        global_min_tour_length: длина наименьшего текущего маршрута
+        first_time: при первом прохождении муравьями нецелесообразно обновлять каждым муравьем феромоны (новое значение
+            будет равно старому)
 
         :param distances: матрица расстояний между пунктами
-        :param ants_count: количество муравьев в колонии
         :param alpha: коэффициент влияния феромонов на выбор пути
         :param beta: коэффициент влияния расстояния между городами на выбор пути
         :param rho: скорость испарения феромона
         :param q0: параметр, определяющий влияние случайности при выборе следующего города муравьем (чем q0 больше, тем
         менее случаен выбор)
-        :param iters_count: количество запусков поиска колонией оптимального пути
         """
 
-        np.fill_diagonal(distances, 0)
         self.distances = np.array(distances)
+        np.fill_diagonal(self.distances, 0)
         self._cities = list(range(len(distances)))
-        self.ants_count = 2 * len(self._cities)
         self.alpha = alpha
         self.beta = beta
         self.rho = rho
         self.q0 = q0
+
         self.iters_count = 2 * len(self._cities)
-        
+        self.ants_count = 2 * len(self._cities)
         self.tour_length = 0
         self.min_nn_heuristic = self.__nearest_neighbor_heuristic()
         self.tau0 = 1 / (len(distances)*self.min_nn_heuristic) if len(distances)*self.min_nn_heuristic != 0 else 0
         self.sigma = self.rho
         self.pheromones_on_arcs = np.full_like(self.distances, self.tau0, dtype = np.double)
         np.fill_diagonal(self.pheromones_on_arcs, 0)
+        self.global_min_tour = []
+        self.global_min_tour_length = 0
+        self.first_time = True
 
     @property
     def cities(self):
         return self._cities.copy()
 
     def ants_full_search(self):
-        self.global_min_tour = []
-        self.global_min_tour_length = 0
-        self.first_time = True
-        # поиск маршрута муравьями в количестве ants_count, локальное обновление феромонов каждым муравьем после поиска
+        """
+
+        Цикл из iters_count итераций поиска муравьями маршрутов. Каждая новая итерация опирается на результаты предыдущей
+        путем обновления на предыдущей итерации карты распределения феромонов
+
+        Каждый муравей ищет маршрут, затем обновляет феромоны на найденном маршруте, после чего маршрут ищет следующий муравей
+        Когда все муравьи нашли маршруты, происходит глобальное обновление (испарение) феромонов
+
+        :return: None
+        """
+
         for iteration in range(self.iters_count):
             self.__searching_iteration()
             self.first_time = False
@@ -71,9 +86,8 @@ class Colony:
         Поскольку граф полносвязный, считается, что в список непосещенных городов входят все города, кроме
         первого, из которого муравей начинает движение
 
-        :return: None
+        :return: self.global_min_tour_length: наилучший маршрут по результатам выполнения всего алгоритма ACS
         """
-
         for ant in range(self.ants_count):
             self.tour_current = []
             self.tour_length = 0
@@ -109,13 +123,14 @@ class Colony:
 
     def __choose_next_city(self):
         """
+
         Берется значение феромона на дороге между текущим городом current_city и потенциальным кандидатом candidate,
         затем рассчитываются параметры для вычисления вероятности: n^alpha, tau^beta.
         Вероятность - вероятность того, что муравей посетит определенный город. Чем выше, тем больше шанс у муравья
         пойти в определенную точку.
         Вероятности для всех потенциальных кандидатов хранятся в probabilities, значение их рассчитывается как
         (pheromones_on_arc ^ alpha) * visibility / denumerator, где:
-            denumerator сумма всех числителей дробей;
+            denumerator - сумма всех числителей дробей;
             visibility = (1 / distance) ^ beta, distance - расстояние между текущим городом и кандидатом на посещение.
 
         Одновременно с этим рассчитывается параметр tau * (n^beta).
@@ -135,7 +150,7 @@ class Colony:
         for candidate in range(len(self.non_visited_cities)):
             pheromones_on_arc = self.pheromones_on_arcs[self.current_city][self.non_visited_cities[candidate]]
             visibility = (1 / self.distances[self.current_city][self.non_visited_cities[candidate]]) ** self.beta
-            # attract = tau * (n^beta)
+            # attract = tau * (n^beta) согласно алгоритму
             attract[candidate] = pheromones_on_arc * visibility
             probabilities[candidate] = (pheromones_on_arc ** self.alpha) * visibility
             denumerator += probabilities[candidate]
@@ -187,6 +202,7 @@ class Colony:
 
     def __global_pheromones_update(self):
         """
+
         При глобальном обновлении феромоны на всех возможных путях обновляет муравей с кратчайшим на текущий момент
         маршрутом.
 
@@ -246,22 +262,27 @@ def input_matrix():
     """
 
     Ввод матрицы смежности
-    Вводится первая строчка, после чего на основании ее длины будет подсчитано, сколько еще строк нужно.
+    Вводится первая строчка, после чего на основании ее длины будет подсчитано, сколько еще строк нужно и какой размерности
+    они должны быть.
     Если в рамках любой строки, следующей за первой, было введено больше значений, чем столбцов в первой строке,
     то "конец" введенного будет "обрезан"
 
     :return: distances: матрица смежности
     """
     distances = []
-    try:
-        distances.append([int(num) for num in input().split()])
-        for num in range(len(distances[0]) - 1):
-            distances.append([int(i) for i in input().split()[:len(distances[0])]])
-    except:
-        raise ValueError('Inappropriate symbol has been met (not int)')
-    return distances
+    while True:
+        try:
+            distances.append([int(num) for num in input().split()])
+            for num in range(len(distances[0]) - 1):
+                distances.append([int(i) for i in input().split()[:len(distances[0])]])
+        except:
+            print('Inappropriate symbol has been met (not int)')
+            continue
+        return distances
+
+distances = input_matrix()
+#distances = np.random.randint(1,50, (20,20))
 
 if __name__ == '__main__':
-    distances = input_matrix()
     x = Colony(distances)
     print(x.ants_full_search())
